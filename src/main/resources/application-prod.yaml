@@ -1,0 +1,20 @@
+# Production-only overrides. Activated with SPRING_PROFILES_ACTIVE=prod.
+logging:
+  # Structured (JSON) logging in the ECS format. Every MDC entry is emitted as a top-level field,
+  # so the correlationId — and the trace.id/span.id injected by the New Relic agent — end up
+  # queryable in New Relic Logs without any parsing rule.
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        name: ${spring.application.name}
+        environment: ${APP_ENVIRONMENT:production}
+  level:
+    root: INFO
+
+spring:
+  jpa:
+    properties:
+      hibernate:
+        format_sql: false

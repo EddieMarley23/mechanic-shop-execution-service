@@ -1,0 +1,9 @@
+{
+  "filepath": "**/*.java",
+  "bracketSameLine": true,
+  "endOfLine": "crlf",
+  "tabWidth": 4,
+  "useTabs": true,
+  "semi": true,
+  "printWidth": 120
+}

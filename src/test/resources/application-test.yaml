@@ -1,0 +1,11 @@
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        # No broker in tests: commands are delivered straight to the listener method.
+        auto-startup: false
+
+app:
+  outbox:
+    # The relay is exercised on demand; it must not race the assertions.
+    poll-interval-ms: 3600000

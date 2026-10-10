@@ -1,0 +1,70 @@
+server:
+  port: ${SERVER_PORT:8082}
+
+spring:
+  application:
+    name: mechanic-shop-execution
+
+  mongodb:
+    # Transactions (used by the outbox) require a replica set. MongoDB Atlas always is one; the
+    # local container runs as a single-node replica set, hence directConnection=true.
+    uri: ${MONGODB_URI:mongodb://localhost:27017/execution-db?replicaSet=rs0&directConnection=true}
+
+  data:
+    mongodb:
+      auto-index-creation: true
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # A command that keeps failing is retried in memory and then rejected without requeue,
+        # which routes it to the dead-letter queue declared in RabbitTopologyConfig.
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-retries: 3
+          initial-interval: 1s
+          multiplier: 2
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,mongo
+  health:
+    # A broker outage is absorbed by the outbox and should not take the pod out of rotation.
+    rabbit:
+      enabled: false
+
+springdoc:
+  api-docs:
+    path: /api/executions/v3/api-docs
+  swagger-ui:
+    path: /api/executions/swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+api:
+  security:
+    token:
+      secret: ${JWT_SECRET:local-dev-jwt-secret-change-me}
+      issuer: ${JWT_ISSUER:mechanic-shop-api}
+
+app:
+  outbox:
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    batch-size: 50

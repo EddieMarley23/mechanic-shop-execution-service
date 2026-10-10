@@ -1,0 +1,51 @@
+infra/.terraform/
+infra/kind/.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+.codex
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+.env/
+
+.env
+.codex
+
+### New Relic ###
+# The Java agent is downloaded at build time by the Dockerfile; never commit the binaries.
+infra/newrelic/newrelic.jar
+infra/newrelic/newrelic-java.zip
+infra/newrelic/newrelic/
+newrelic_agent.log
