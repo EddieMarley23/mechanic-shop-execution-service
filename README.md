@@ -35,6 +35,8 @@ Comandos são idempotentes: uma reentrega é reconhecida e ignorada. As resposta
 
 `DIAGNOSIS_QUEUED` → `IN_DIAGNOSIS` → `AWAITING_APPROVAL` → `REPAIR_QUEUED` → `IN_REPAIR` → `COMPLETED`, ou `FAILED` (reparo inviável) ou `CANCELED` (Saga compensada). O reparo só pode começar depois que a Saga libera, isto é, depois de orçamento aprovado e pago.
 
+A arquitetura do serviço (componentes, modelo de dados, ciclo de vida e participação na Saga) está em [docs/architecture.md](docs/architecture.md).
+
 ### Camadas
 
 Pacote raiz `org.project.mechanic_shop.execution`, em arquitetura hexagonal:
@@ -61,7 +63,7 @@ Swagger: `http://localhost:8082/api/executions/swagger-ui/index.html`. O JWT é 
 
 ## Execução
 
-Para subir os três serviços juntos, use o `docker compose` da pasta que os reúne. Para rodar só este serviço, ele precisa de um MongoDB em replica set e de um RabbitMQ:
+Para subir os três serviços juntos, use o `docker-compose.full.yaml` do repositório `mechanic-shop-os-service` (com os três repositórios clonados lado a lado): `docker compose -f docker-compose.full.yaml up --build -d`. Para rodar só este serviço, ele precisa de um MongoDB em replica set e de um RabbitMQ:
 
 ```bash
 ./mvnw spring-boot:run
@@ -83,3 +85,16 @@ Para subir os três serviços juntos, use o `docker compose` da pasta que os re�
 - BDD em `src/test/resources/features/execucao_da_ordem_de_servico.feature` (7 cenários, da fila à conclusão).
 - Testes de integração com MongoDB real: mapeamento, transação com rollback, outbox e segurança.
 - O build falha se a cobertura de linhas ficar abaixo de 80%. Medição em 10/10/2026: **63 testes unitários + 5 de integração, 94,9% de linhas** nos unitários (`target/site/jacoco/index.html`).
+
+## CI/CD
+
+O workflow `.github/workflows/ci-cd.yml` roda `./mvnw verify` (com o gate de 80% de cobertura) em todo PR para `master`, publica o relatório de cobertura como artefato e, se o secret `SONAR_TOKEN` existir, faz a análise no SonarQube/SonarCloud com quality gate. No push para `master`, publica a imagem no Docker Hub e aplica `k8s/` no EKS, no namespace `mechanic-shop`.
+
+O RabbitMQ, o Kong e o Mailpit do cluster são implantados pelo pipeline do OS Service; no primeiro deploy, rode-o antes deste. O Kong encaminha ``/api/executions/**`` para o Service ``execution-service:8082``.
+
+| GitHub | Nome |
+|---|---|
+| Secrets | `AWS_ROLE_TO_ASSUME`, `DOCKERHUB_TOKEN`, `JWT_SECRET`, `MONGODB_URI` (MongoDB em replica set, ex.: Atlas), `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `NEW_RELIC_LICENSE_KEY`, `SONAR_TOKEN` (opcional) |
+| Variables | `AWS_REGION`, `DOCKERHUB_USERNAME`, `EKS_CLUSTER_NAME`, `NEW_RELIC_APP_NAME`, `SONAR_PROJECT_KEY`, `SONAR_ORGANIZATION`, `SONAR_HOST_URL` |
+
+`JWT_SECRET` e `RABBITMQ_USERNAME`/`RABBITMQ_PASSWORD` precisam ter o mesmo valor nos três repositórios.

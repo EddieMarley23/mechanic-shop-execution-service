@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: execution-service
+  namespace: ${namespace}
+spec:
+  replicas: ${app_replicas}
+  selector:
+    matchLabels:
+      app: execution-service
+  template:
+    metadata:
+      labels:
+        app: execution-service
+      annotations:
+        # Hash do ConfigMap + Secret, calculado pelo pipeline: muda quando so a configuracao
+        # muda (ex.: PAYMENT_PROVIDER, credenciais) e forca o rollout mesmo com a mesma imagem.
+        checksum/config: "${config_checksum}"
+    spec:
+      containers:
+        - name: execution-service
+          image: ${app_image}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: execution-service-config
+            - secretRef:
+                name: execution-service-secret
+          env:
+            # Metadados usados pelo agente New Relic para ligar APM, logs e traces ao pod.
+            - name: NEW_RELIC_METADATA_KUBERNETES_CLUSTER_NAME
+              value: ${cluster_name}
+            - name: NEW_RELIC_METADATA_KUBERNETES_NAMESPACE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NEW_RELIC_METADATA_KUBERNETES_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NEW_RELIC_METADATA_KUBERNETES_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NEW_RELIC_METADATA_KUBERNETES_DEPLOYMENT_NAME
+              value: execution-service
+            - name: NEW_RELIC_METADATA_KUBERNETES_CONTAINER_NAME
+              value: execution-service
+          # Readiness = readinessState + MongoDB. O broker fica fora de proposito: a outbox
+          # absorve uma queda do RabbitMQ sem tirar o pod de rotacao.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: ${app_cpu_request}
+              memory: ${app_memory_request}
+            limits:
+              cpu: ${app_cpu_limit}
+              memory: ${app_memory_limit}

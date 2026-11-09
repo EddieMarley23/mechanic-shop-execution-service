@@ -1,0 +1,5 @@
+# Mesmo namespace dos outros servicos. Aplicar de mais de um repositorio e idempotente.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ${namespace}
