@@ -1,5 +1,8 @@
 # Execution Service
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=EddieMarley23_mechanic-shop-execution-service&metric=alert_status)](https://sonarcloud.io/summary/overall?id=EddieMarley23_mechanic-shop-execution-service)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=EddieMarley23_mechanic-shop-execution-service&metric=coverage)](https://sonarcloud.io/component_measures?id=EddieMarley23_mechanic-shop-execution-service&metric=coverage)
+
 Microsserviço de execução da oficina mecânica (Tech Challenge — Fase 4). Mantém a fila de trabalho da oficina: recebe as ordens para diagnóstico, registra o diagnóstico do mecânico, acompanha o reparo e comunica a finalização.
 
 ## Visão do serviço
@@ -84,7 +87,18 @@ Para subir os três serviços juntos, use o `docker-compose.full.yaml` do reposi
 - Testes unitários de domínio, casos de uso, controller, segurança e infraestrutura.
 - BDD em `src/test/resources/features/execucao_da_ordem_de_servico.feature` (7 cenários, da fila à conclusão).
 - Testes de integração com MongoDB real: mapeamento, transação com rollback, outbox e segurança.
-- O build falha se a cobertura de linhas ficar abaixo de 80%. Medição em 10/10/2026: **63 testes unitários + 5 de integração, 94,9% de linhas** nos unitários (`target/site/jacoco/index.html`).
+- O build falha se a cobertura de linhas ficar abaixo de 80%.
+
+### Evidência de cobertura
+
+Medição de 09/11/2026 (`./mvnw verify`, todos os testes passando):
+
+| Testes | Linhas | Condições | Cobertura no SonarCloud (linhas + condições) |
+|---|---|---|---|
+| 63 unitários + 5 de integração | 94,9% | 89,7% | **94,2%** |
+
+- Relatório JaCoCo local: `target/site/jacoco/index.html` (unitários).
+- No CI, todo PR e todo push publica o relatório como artefato `coverage-report` do workflow e envia a cobertura ao SonarCloud, cujo quality gate precisa passar: [painel do projeto](https://sonarcloud.io/summary/overall?id=EddieMarley23_mechanic-shop-execution-service).
 
 ## CI/CD
 

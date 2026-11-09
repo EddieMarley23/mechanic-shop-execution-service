@@ -10,7 +10,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -25,7 +25,9 @@ public class SecurityConfigurations {
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) {
 		return http
-			.csrf(AbstractHttpConfigurer::disable)
+			// Stateless API authenticated by a Bearer token in the Authorization header: there are no
+			// session cookies for a browser to send automatically, so there is nothing for CSRF to forge.
+			.csrf(AbstractHttpConfigurer::disable) // NOSONAR java:S4502 - see the comment above
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(authorize ->
 				authorize
@@ -50,8 +52,7 @@ public class SecurityConfigurations {
 	 */
 	@Bean
 	public UserDetailsService userDetailsService() {
-		return username -> {
-			throw new UsernameNotFoundException("This service has no local users.");
-		};
+		// Empty store: every lookup fails inside Spring Security, with no user-specific message.
+		return new InMemoryUserDetailsManager();
 	}
 }
