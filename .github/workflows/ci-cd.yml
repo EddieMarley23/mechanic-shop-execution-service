@@ -1,0 +1,112 @@
+name: Application CI/CD
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarQube usa o historico para blame e codigo novo
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Unitarios + BDD + integracao com MongoDB (Testcontainers); falha abaixo de 80% de linhas.
+      - name: Build and test
+        run: ./mvnw --batch-mode verify
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/site/jacoco/
+          if-no-files-found: ignore
+
+      # Analise de qualidade com quality gate. Configure o secret SONAR_TOKEN e as variables
+      # SONAR_PROJECT_KEY, SONAR_ORGANIZATION (SonarCloud) e, para SonarQube proprio, SONAR_HOST_URL.
+      - name: SonarQube analysis
+        if: env.SONAR_TOKEN != ''
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY || 'mechanic-shop-execution-service' }}
+        run: |
+          args=(
+            -Dsonar.host.url="$SONAR_HOST_URL"
+            -Dsonar.projectKey="$SONAR_PROJECT_KEY"
+            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml
+            -Dsonar.qualitygate.wait=true
+          )
+          if [ -n "$SONAR_ORGANIZATION" ]; then args+=(-Dsonar.organization="$SONAR_ORGANIZATION"); fi
+          ./mvnw --batch-mode org.sonarsource.scanner.maven:sonar-maven-plugin:5.0.0.4389:sonar "${args[@]}"
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push image
+        run: |
+          echo "app_image=${{ vars.DOCKERHUB_USERNAME }}/mechanic-shop-execution:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          docker build -t "${{ vars.DOCKERHUB_USERNAME }}/mechanic-shop-execution:${GITHUB_SHA}" .
+          docker push "${{ vars.DOCKERHUB_USERNAME }}/mechanic-shop-execution:${GITHUB_SHA}"
+      - name: Configure kubectl
+        run: aws eks update-kubeconfig --name "${{ vars.EKS_CLUSTER_NAME }}" --region "${{ vars.AWS_REGION }}"
+      - name: Render and apply Kubernetes manifests
+        env:
+          namespace: mechanic-shop
+          app_image: ${{ env.app_image }}
+          app_replicas: '1'
+          app_cpu_request: 250m
+          app_cpu_limit: 1000m
+          app_memory_request: 256Mi
+          app_memory_limit: 512Mi
+          hpa_min_replicas: '1'
+          hpa_max_replicas: '5'
+          hpa_cpu_average_utilization: '80'
+          cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
+          newrelic_app_name: ${{ vars.NEW_RELIC_APP_NAME || 'mechanic-shop-execution' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          RABBITMQ_USERNAME: ${{ secrets.RABBITMQ_USERNAME }}
+          RABBITMQ_PASSWORD: ${{ secrets.RABBITMQ_PASSWORD }}
+          NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
+        run: |
+          render() { find "$@" -type f -name '*.yaml' -print0 | xargs -0 -I{} sh -c 'envsubst < "$1" | kubectl apply -f -' sh {}; }
+          render k8s/00-namespaces
+          # O Secret vem antes do Deployment, para o pod nao subir sem credenciais.
+          kubectl create secret generic execution-service-secret --namespace "$namespace" \
+            --from-literal=MONGODB_URI="$MONGODB_URI" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=RABBITMQ_USERNAME="$RABBITMQ_USERNAME" \
+            --from-literal=RABBITMQ_PASSWORD="$RABBITMQ_PASSWORD" \
+            --from-literal=NEW_RELIC_LICENSE_KEY="$NEW_RELIC_LICENSE_KEY" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          # Hash da configuracao: reinicia os pods quando so a configuracao muda (mesma imagem).
+          export config_checksum=$( { for f in k8s/01-config/*.yaml; do envsubst < "$f"; done; kubectl get secret execution-service-secret --namespace "$namespace" -o jsonpath='{.data}'; } | sha256sum | cut -c1-16)
+          render k8s/01-config k8s/03-app
+          kubectl rollout status deployment/execution-service --namespace "$namespace" --timeout=5m

@@ -1,0 +1,15 @@
+# ClusterIP: o acesso externo passa pelo Kong (rotas /api/executions/**).
+# O nome `execution-service` e o upstream configurado no Kong.
+apiVersion: v1
+kind: Service
+metadata:
+  name: execution-service
+  namespace: ${namespace}
+spec:
+  type: ClusterIP
+  selector:
+    app: execution-service
+  ports:
+    - name: http
+      port: 8082
+      targetPort: 8082
