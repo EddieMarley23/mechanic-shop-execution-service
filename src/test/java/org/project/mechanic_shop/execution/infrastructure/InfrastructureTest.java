@@ -346,18 +346,11 @@ class InfrastructureTest {
 	class Topology {
 
 		@Test
-		void shouldDeclareEveryQueueWithItsDeadLetterQueue() {
+		void shouldDeclareOnlyTheExecutionQueueWithItsDeadLetterQueue() {
 			List<Declarable> declarables = List.copyOf(new RabbitTopologyConfig().sagaTopology().getDeclarables());
 
 			List<String> queues = declarables.stream().filter(Queue.class::isInstance).map(d -> ((Queue) d).getName()).toList();
-			assertThat(queues).containsExactlyInAnyOrder(
-				"billing.commands",
-				"billing.commands.dlq",
-				"execution.commands",
-				"execution.commands.dlq",
-				"os.saga-replies",
-				"os.saga-replies.dlq"
-			);
+			assertThat(queues).containsExactlyInAnyOrder("execution.commands", "execution.commands.dlq");
 		}
 	}
 
