@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Validates the JWT issued by the OS Service (staff login) or by the CPF-login Lambda (customers).
+ * Validates the JWT issued by the OS Service email/password login.
  *
  * <p>This service has no user table, so the token is the only source of identity: the subject is
  * the user's e-mail and the {@code role} claim is the user's role.

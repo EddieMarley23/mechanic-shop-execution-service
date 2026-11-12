@@ -102,13 +102,13 @@ Medição de 09/11/2026 (`./mvnw verify`, todos os testes passando):
 
 ## CI/CD
 
-O workflow `.github/workflows/ci-cd.yml` roda `./mvnw verify` (com o gate de 80% de cobertura) em todo PR para `master`, publica o relatório de cobertura como artefato e, se o secret `SONAR_TOKEN` existir, faz a análise no SonarQube/SonarCloud com quality gate. No push para `master`, publica a imagem no Docker Hub e aplica `k8s/` no EKS, no namespace `mechanic-shop`.
+O workflow `.github/workflows/ci-cd.yml` valida `terraform/` e roda `./mvnw verify` (com o gate de 80% de cobertura) em todo PR para `master`, publica o relatório de cobertura como artefato e, se o secret `SONAR_TOKEN` existir, faz a análise no SonarQube/SonarCloud com quality gate. No push para `master`, verifica as credenciais AWS e o EKS criado pelo OS, provisiona MongoDB Atlas M0 com Terraform, publica a imagem no Docker Hub e aplica só os seus manifestos no namespace `mechanic-shop`. Instruções da conta Atlas, secrets e variables em [terraform/README.md](terraform/README.md).
 
-O RabbitMQ, o Kong e o Mailpit do cluster são implantados pelo pipeline do OS Service; no primeiro deploy, rode-o antes deste. O Kong encaminha ``/api/executions/**`` para o Service ``execution-service:8082``.
+O EKS, o RabbitMQ, o Kong, o Mailpit e o namespace são implantados pelo pipeline do OS Service; no primeiro deploy, rode-o antes deste. O Execution declara só sua fila e dead-letter queue no broker compartilhado. O Kong encaminha ``/api/executions/**`` para o Service ``execution-service:8082``.
 
 | GitHub | Nome |
 |---|---|
-| Secrets | `AWS_ROLE_TO_ASSUME`, `DOCKERHUB_TOKEN`, `JWT_SECRET`, `MONGODB_URI` (MongoDB em replica set, ex.: Atlas), `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `NEW_RELIC_LICENSE_KEY`, `SONAR_TOKEN` (opcional) |
-| Variables | `AWS_REGION`, `DOCKERHUB_USERNAME`, `EKS_CLUSTER_NAME`, `NEW_RELIC_APP_NAME`, `SONAR_PROJECT_KEY`, `SONAR_ORGANIZATION`, `SONAR_HOST_URL` |
+| Secrets | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `DOCKERHUB_TOKEN`, `JWT_SECRET`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `ATLAS_PUBLIC_KEY`, `ATLAS_PRIVATE_KEY`, `MONGODB_PASSWORD`; `NEW_RELIC_LICENSE_KEY`, `SONAR_TOKEN` opcionais |
+| Variables | `DOCKERHUB_USERNAME`, `ATLAS_ORG_ID`; opcionais: `AWS_REGION`, `EKS_CLUSTER_NAME`, `NEW_RELIC_APP_NAME`, `SONAR_PROJECT_KEY`, `SONAR_ORGANIZATION`, `SONAR_HOST_URL` |
 
 `JWT_SECRET` e `RABBITMQ_USERNAME`/`RABBITMQ_PASSWORD` precisam ter o mesmo valor nos três repositórios.
